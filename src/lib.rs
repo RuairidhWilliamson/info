@@ -1,32 +1,62 @@
-//! Info about the current version, git info, os info and rustc version
+//! Info about the current cargo pkg version, git info, os info and rustc version
+//!
+//! # Example
+//!
+//! ```rust
+//! use info::{Info, raw_info};
+//!
+//! let info = Info::new(raw_info!());
+//! println!("{info}");
+//! ```
+
+use std::borrow::Cow;
+
+/// Raw info without parsing that is compiled into the program
+#[derive(Debug, Clone, Copy)]
+pub struct RawInfo {
+    /// Cargo pkg version, from the env var cargo sets `CARGO_PKG_VERSION`
+    pub cargo_pkg_version: &'static str,
+    /// Current git info
+    pub git_version: &'static str,
+    /// Rustc version used to compile the program
+    pub rustc_version: &'static str,
+}
 
 /// The collection of information
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Info {
-    /// Pkg version
-    pub version: semver::Version,
-    /// Git hash
-    pub git_version: &'static str,
-    /// OS info
-    pub os: os_info::Info,
-    /// Rustc version used to compile
+    /// Cargo pkg version, from the env var cargo sets `CARGO_PKG_VERSION`
+    pub cargo_pkg_version: semver::Version,
+    /// Current git info
+    pub git_version: Cow<'static, str>,
+    /// Rustc version used to compile the program
     pub rustc_version: semver::Version,
+    /// Runtime information about the current operating system
+    pub os: os_info::Info,
 }
 
 impl Info {
-    /// Create [`Info`] using `version` and `git_version`
+    /// Create [`Info`] using [`RawInfo`]
     ///
-    /// Recommended to use `info!()` which wraps this.
+    /// It is recommended to construct [`RawInfo`] using [`raw_info!()`].
+    ///
+    /// # Example
+    /// ```rust
+    /// use info::{Info, raw_info};
+    ///
+    /// let info = Info::new(raw_info!());
+    /// println!("{info}");
+    /// ```
     ///
     /// # Panics
     /// Panics if `version` does not parse as semver or `rustc_version` does not parse as semver
-    pub fn new(version: &'static str, git_version: &'static str) -> Self {
+    pub fn new(raw: RawInfo) -> Self {
         Self {
-            version: version.parse().unwrap(),
-            git_version,
+            cargo_pkg_version: raw.cargo_pkg_version.parse().unwrap(),
+            git_version: Cow::Borrowed(raw.git_version),
+            rustc_version: raw.rustc_version.parse().unwrap(),
             os: os_info::get(),
-            rustc_version: env!("RUSTC_VERSION").parse().unwrap(),
         }
     }
 }
@@ -34,13 +64,13 @@ impl Info {
 impl std::fmt::Display for Info {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self {
-            version,
+            cargo_pkg_version,
             git_version,
             os,
             rustc_version,
         } = self;
         f.write_fmt(format_args!(
-            "{version} {git_version} rustc-{rustc_version} {os}"
+            "{cargo_pkg_version} {git_version} rustc-{rustc_version} {os}"
         ))
     }
 }
@@ -48,17 +78,15 @@ impl std::fmt::Display for Info {
 #[doc(hidden)]
 pub use git_version;
 
-/// Get [`Info`] for the current pkg
-///
-/// # Panics
-/// Panics if `version` does not parse as semver or `rustc_version` does not parse as semver
+/// Get [`RawInfo`] for the current pkg
 #[macro_export]
-macro_rules! info {
+macro_rules! raw_info {
     () => {
-        $crate::Info::new(
-            env!("CARGO_PKG_VERSION"),
-            $crate::git_version::git_version!(fallback = "unknown"),
-        )
+        $crate::RawInfo {
+            cargo_pkg_version: env!("CARGO_PKG_VERSION"),
+            git_version: $crate::git_version::git_version!(fallback = "unknown"),
+            rustc_version: env!("RUSTC_VERSION"),
+        }
     };
 }
 
