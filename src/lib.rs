@@ -1,5 +1,24 @@
 //! Info about the current cargo pkg version, git info, os info and rustc version
 //!
+//! # Usage
+//!
+//! ```toml
+//! [dependencies]
+//! info = { git = "https://github.com/RuairidhWilliamson/info" }
+//!
+//! [build-dependencies]
+//! info = { git = "https://github.com/RuairidhWilliamson/info" }
+//! ```
+//!
+//! You must setup a build script with the following:
+//!
+//! build.rs
+//! ```rust no_run
+//! fn main() {
+//!     info::build_script();
+//! }
+//! ```
+//!
 //! # Example
 //!
 //! ```rust
@@ -7,6 +26,10 @@
 //!
 //! let info = Info::new(raw_info!());
 //! println!("{info}");
+//!
+//! // Or use a static LazyLock
+//! let info_str = lazy_info_str!();
+//! println!("{info_str}");
 //! ```
 
 use std::borrow::Cow;
@@ -20,6 +43,10 @@ pub struct RawInfo {
     pub git_version: &'static str,
     /// Rustc version used to compile the program
     pub rustc_version: &'static str,
+    /// Target triple the binary was compiled for
+    pub target: &'static str,
+    /// Cargo profile used to compile the binary
+    pub profile: &'static str,
 }
 
 /// The collection of information
@@ -34,6 +61,10 @@ pub struct Info {
     pub rustc_version: semver::Version,
     /// Runtime information about the current operating system
     pub os: os_info::Info,
+    /// Target triple the binary was compiled for
+    pub target: Cow<'static, str>,
+    /// Cargo profile used to compile the binary
+    pub profile: Cow<'static, str>,
 }
 
 impl Info {
@@ -57,6 +88,8 @@ impl Info {
             git_version: Cow::Borrowed(raw.git_version),
             rustc_version: raw.rustc_version.parse().unwrap(),
             os: os_info::get(),
+            target: Cow::Borrowed(raw.target),
+            profile: Cow::Borrowed(raw.profile),
         }
     }
 }
@@ -68,9 +101,11 @@ impl std::fmt::Display for Info {
             git_version,
             os,
             rustc_version,
+            target,
+            profile,
         } = self;
         f.write_fmt(format_args!(
-            "{cargo_pkg_version} {git_version} rustc-{rustc_version} {os}"
+            "{cargo_pkg_version} {git_version} {target} {profile} rustc-{rustc_version} {os}"
         ))
     }
 }
@@ -85,7 +120,9 @@ macro_rules! raw_info {
         $crate::RawInfo {
             cargo_pkg_version: env!("CARGO_PKG_VERSION"),
             git_version: $crate::git_version::git_version!(fallback = "unknown"),
-            rustc_version: env!("RUSTC_VERSION"),
+            rustc_version: env!("INFO_RUSTC_VERSION"),
+            target: env!("INFO_TARGET"),
+            profile: env!("INFO_PROFILE"),
         }
     };
 }
@@ -98,7 +135,24 @@ macro_rules! raw_info {
 macro_rules! lazy_info_str {
     () => {{
         static INFO_STR: std::sync::LazyLock<String> =
-            std::sync::LazyLock::new(|| $crate::info!().to_string());
+            std::sync::LazyLock::new(|| $crate::Info::new($crate::raw_info!()).to_string());
         &*INFO_STR
     }};
+}
+
+/// Collects information from the build script context and forwards it to the rustc invocation as env vars
+///
+/// # Panics
+/// Panics if env vars that are expected to be set by cargo are not present
+pub fn build_script() {
+    let rustc_version = rustc_version::version().unwrap();
+    println!("cargo::rustc-env=INFO_RUSTC_VERSION={rustc_version}");
+
+    let target = std::env::var("TARGET").unwrap();
+    println!("cargo::rustc-env=INFO_TARGET={target}");
+
+    let profile = std::env::var("PROFILE").unwrap();
+    println!("cargo::rustc-env=INFO_PROFILE={profile}");
+
+    println!("cargo::rerun-if-changed=build.rs");
 }
