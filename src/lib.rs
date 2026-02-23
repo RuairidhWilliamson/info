@@ -1,4 +1,7 @@
-//! Info about the current cargo pkg version, git info, os info and rustc version
+#![allow(clippy::needless_doctest_main)]
+
+//! A simple crate to collect information about the build environment.
+//! Info about the current cargo pkg version, git info, OS info and rustc version
 //!
 //! # Usage
 //!
@@ -27,7 +30,7 @@
 //! let info = Info::new(raw_info!());
 //! println!("{info}");
 //!
-//! // Or use a static LazyLock
+//! // Or use a static LazyLock to fetch once and reuse
 //! let info_str = lazy_info_str!();
 //! println!("{info_str}");
 //! ```

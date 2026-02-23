@@ -2,6 +2,12 @@
 name = "info"
 version = "0.0.0"
 edition = "2024"
+repository = "https://github.com/RuairidhWilliamson/info"
+readme = "readme.md"
+description = "A simple crate to collect information about the build environment."
+license-file = "licence.md"
+keywords = ["build", "info"]
+categories = ["development-tools"]
 
 [features]
 serde = ["dep:serde", "semver/serde"]
@@ -29,7 +35,7 @@ clone_on_ref_ptr = "warn"
 create_dir = "warn"
 dbg_macro = "warn"
 exit = "warn"
-string_to_string = "warn"
+implicit_clone = "warn"
 undocumented_unsafe_blocks = "warn"
 unused_result_ok = "warn"
 unused_trait_names = "warn"
